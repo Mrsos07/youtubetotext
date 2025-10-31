@@ -7,12 +7,26 @@ import os
 import time
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///youtube_transcripts.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
 
 CORS(app)
 db.init_app(app)
+
+# Security Headers
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:;"
+    return response
 
 # Flask-Login setup
 login_manager = LoginManager()
@@ -63,9 +77,28 @@ def register():
     
     if request.method == 'POST':
         data = request.get_json() if request.is_json else request.form
-        username = data.get('username')
-        email = data.get('email')
-        password = data.get('password')
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        
+        # Input validation
+        if not username or len(username) < 3 or len(username) > 50:
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'اسم المستخدم يجب أن يكون بين 3 و 50 حرف'}), 400
+            flash('اسم المستخدم يجب أن يكون بين 3 و 50 حرف')
+            return render_template('register.html')
+        
+        if not email or '@' not in email or len(email) > 120:
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'البريد الإلكتروني غير صحيح'}), 400
+            flash('البريد الإلكتروني غير صحيح')
+            return render_template('register.html')
+        
+        if not password or len(password) < 6:
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'}), 400
+            flash('كلمة المرور يجب أن تكون 6 أحرف على الأقل')
+            return render_template('register.html')
         
         if User.query.filter_by(email=email).first():
             if request.is_json:
@@ -135,6 +168,13 @@ def get_transcript():
         if not url:
             print("ERROR: No URL provided")
             return jsonify({'error': 'URL is required'}), 400
+        
+        # Validate YouTube URL
+        import re
+        youtube_regex = r'(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+'
+        if not re.match(youtube_regex, url):
+            print("ERROR: Invalid YouTube URL")
+            return jsonify({'error': 'رابط يوتيوب غير صحيح'}), 400
         
         print(f"Video URL: {url}")
         print(f"Sending to n8n: {N8N_WEBHOOK_URL}")
