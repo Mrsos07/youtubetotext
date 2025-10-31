@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+youtube_transcripts.db
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Old React files (not needed)
+node_modules/
+dist/
+dist-ssr/
+*.local
+src/
+public/
+index.html
+vite.config.js
+package.json
+package-lock.json
+.eslintrc.cjs
+
+# Environment variables
+.env
+.env.local
+.env.production

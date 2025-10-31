@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ملفاتي - YouTube Transcript</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Tajawal', sans-serif; }
+        body { background: #0f0f0f; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <nav class="bg-gray-900 border-b border-gray-800 px-4 py-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-white font-bold text-xl">YouTube Transcript</a>
+                <a href="/" class="text-gray-400 hover:text-white">الرئيسية</a>
+                <a href="/my-files" class="text-red-500 font-semibold">ملفاتي</a>
+            </div>
+            <a href="/logout" class="text-gray-400 hover:text-red-500">تسجيل الخروج</a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <h1 class="text-4xl font-bold text-white mb-8">📁 ملفاتي</h1>
+
+        {% if transcripts %}
+        <div class="grid gap-6">
+            {% for transcript in transcripts %}
+            <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-red-600 transition-all">
+                <div class="flex items-start gap-4">
+                    <div class="w-14 h-14 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-bold text-white mb-2">{{ transcript.video_title or 'فيديو يوتيوب' }}</h2>
+                        <a href="{{ transcript.video_url }}" target="_blank" class="text-red-500 hover:text-red-400 text-sm mb-3 inline-block">{{ transcript.video_url }}</a>
+                        <p class="text-gray-400 text-sm mb-4">{{ transcript.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                        
+                        {% if transcript.summary %}
+                        <div class="bg-gray-900 rounded-lg p-4 mb-3">
+                            <h3 class="text-red-500 font-semibold mb-2">الملخص:</h3>
+                            <p class="text-gray-300 text-sm line-clamp-3">{{ transcript.summary }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <button onclick="viewTranscript({{ transcript.id }})" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">عرض التفاصيل</button>
+                        <button onclick="exportTranscriptPDF({{ transcript.id }})" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm ml-2">تصدير PDF</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-16">
+            <svg class="w-24 h-24 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h2 class="text-2xl font-bold text-gray-400 mb-2">لا توجد ملفات بعد</h2>
+            <p class="text-gray-500 mb-6">ابدأ بتفريغ أول فيديو يوتيوب</p>
+            <a href="/" class="inline-block bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg">ابدأ الآن</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-8 text-gray-500 text-sm">
+        <p>صُنع بإتقان © 2025</p>
+    </footer>
+
+    <!-- Modal -->
+    <div id="transcriptModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="bg-gray-900 p-6 border-b border-gray-700 flex justify-between items-center">
+                <h2 id="modalTitle" class="text-2xl font-bold text-white"></h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-3xl">&times;</button>
+            </div>
+            <div class="flex flex-1 overflow-hidden">
+                <!-- Content Section -->
+                <div id="modalContent" class="flex-1 p-6 space-y-6 overflow-y-auto"></div>
+                
+                <!-- ChatBot Section -->
+                <div class="w-96 bg-gray-900 border-l border-gray-700 flex flex-col">
+                    <div class="p-4 border-b border-gray-700">
+                        <h3 class="text-lg font-bold text-white">💬 ناقش المحتوى</h3>
+                    </div>
+                    <div id="chatMessages" class="flex-1 p-4 overflow-y-auto space-y-3">
+                        <div class="text-gray-400 text-center py-8 text-sm">
+                            <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                            </svg>
+                            <p>اسأل أي سؤال عن المحتوى</p>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-700">
+                        <div class="flex gap-2">
+                            <input 
+                                type="text" 
+                                id="chatInput" 
+                                placeholder="اكتب سؤالك..."
+                                class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-red-600 focus:outline-none"
+                                onkeypress="if(event.key === 'Enter') sendChatMessage()"
+                            >
+                            <button 
+                                onclick="sendChatMessage()"
+                                class="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+        let currentTranscript = null;
+
+        async function viewTranscript(id) {
+            try {
+                const response = await fetch(`/api/transcript/${id}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    alert('فشل في تحميل التفاصيل');
+                    return;
+                }
+                
+                currentTranscript = data;
+                
+                document.getElementById('modalTitle').textContent = data.videoTitle || 'تفاصيل الفيديو';
+                
+                let content = '';
+                
+                if (data.video_url) {
+                    content += `<div class="mb-4"><a href="${data.video_url}" target="_blank" class="text-red-500 hover:text-red-400">${data.video_url}</a></div>`;
+                }
+                
+                if (data.introduction) {
+                    content += `
+                        <div class="bg-gray-900 rounded-lg p-4 mb-4">
+                            <h3 class="text-red-500 font-bold mb-2 text-lg">المقدمة</h3>
+                            <p class="text-gray-300 leading-relaxed">${data.introduction}</p>
+                        </div>
+                    `;
+                }
+                
+                if (data.summary) {
+                    content += `
+                        <div class="bg-gray-900 rounded-lg p-4 mb-4">
+                            <h3 class="text-red-500 font-bold mb-2 text-lg">الملخص</h3>
+                            <p class="text-gray-300 leading-relaxed">${data.summary}</p>
+                        </div>
+                    `;
+                }
+                
+                if (data.mainPoints) {
+                    content += `
+                        <div class="bg-gray-900 rounded-lg p-4 mb-4">
+                            <h3 class="text-red-500 font-bold mb-2 text-lg">أهم النقاط</h3>
+                            <p class="text-gray-300 leading-relaxed whitespace-pre-wrap">${data.mainPoints}</p>
+                        </div>
+                    `;
+                }
+                
+                if (data.fullContent) {
+                    content += `
+                        <div class="bg-gray-900 rounded-lg p-4">
+                            <h3 class="text-red-500 font-bold mb-2 text-lg">المحتوى الكامل</h3>
+                            <p class="text-gray-300 leading-relaxed whitespace-pre-wrap text-sm">${data.fullContent}</p>
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('modalContent').innerHTML = content;
+                document.getElementById('transcriptModal').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('حدث خطأ في تحميل التفاصيل');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('transcriptModal').classList.add('hidden');
+            currentTranscript = null;
+            // Clear chat
+            document.getElementById('chatMessages').innerHTML = `
+                <div class="text-gray-400 text-center py-8 text-sm">
+                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    <p>اسأل أي سؤال عن المحتوى</p>
+                </div>
+            `;
+            chatSessionId = null;
+        }
+
+        let chatSessionId = null;
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            input.value = '';
+            
+            addChatMessage('user', message);
+            
+            const typingId = addChatMessage('bot', '...', true);
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        message: message,
+                        sessionId: chatSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById(typingId).remove();
+                
+                if (response.ok) {
+                    if (data.sessionId) {
+                        chatSessionId = data.sessionId;
+                    }
+                    
+                    const botMessage = data.output || data.response || data.message || 'عذراً، لم أتمكن من الحصول على رد';
+                    
+                    if (botMessage && botMessage.trim()) {
+                        addChatMessage('bot', botMessage);
+                    } else {
+                        addChatMessage('bot', 'عذراً، لم أتمكن من الحصول على رد مناسب');
+                    }
+                } else {
+                    const errorMsg = data.error || 'حدث خطأ في الاتصال بالشات بوت';
+                    addChatMessage('bot', `عذراً، ${errorMsg}`);
+                }
+                
+            } catch (error) {
+                console.error('Chat error:', error);
+                document.getElementById(typingId).remove();
+                addChatMessage('bot', 'عذراً، حدث خطأ في الاتصال');
+            }
+        }
+
+        function addChatMessage(type, message, isTyping = false) {
+            const messagesContainer = document.getElementById('chatMessages');
+            
+            const welcome = messagesContainer.querySelector('.text-center');
+            if (welcome) {
+                welcome.remove();
+            }
+            
+            const messageId = 'msg-' + Date.now();
+            const messageDiv = document.createElement('div');
+            messageDiv.id = messageId;
+            messageDiv.className = `flex ${type === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubbleClass = type === 'user' 
+                ? 'bg-red-600 text-white' 
+                : 'bg-gray-700 text-gray-200';
+            
+            messageDiv.innerHTML = `
+                <div class="${bubbleClass} rounded-xl px-3 py-2 max-w-[85%] ${isTyping ? 'animate-pulse' : ''}">
+                    <p class="text-xs leading-relaxed whitespace-pre-wrap">${message}</p>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            return messageId;
+        }
+
+        async function exportTranscriptPDF(id) {
+            try {
+                const response = await fetch(`/api/transcript/${id}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    alert('فشل في تحميل البيانات');
+                    return;
+                }
+                
+                const title = data.videoTitle || 'تفريغ محتوى يوتيوب';
+                const introduction = data.introduction || '';
+                const summary = data.summary || '';
+                const mainPoints = data.mainPoints || '';
+                const fullContent = data.fullContent || '';
+                
+                const htmlContent = `
+                    <div style="font-family: 'Tajawal', Arial, sans-serif; direction: rtl; padding: 20px; color: #000; line-height: 1.8;">
+                        <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #FF0000; text-align: center;">${title}</h1>
+                        ${data.video_url ? `<p style="font-size: 11px; margin-bottom: 20px; color: #666; text-align: center;">الرابط: ${data.video_url}</p>` : ''}
+                        ${introduction ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">المقدمة</h2><p style="font-size: 14px; text-align: justify;">${introduction.replace(/\n/g, '<br>')}</p></div>` : ''}
+                        ${summary ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">الملخص</h2><p style="font-size: 14px; text-align: justify;">${summary.replace(/\n/g, '<br>')}</p></div>` : ''}
+                        ${mainPoints ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">أهم النقاط</h2><p style="font-size: 14px; text-align: justify; white-space: pre-wrap;">${mainPoints.replace(/\n/g, '<br>')}</p></div>` : ''}
+                        ${fullContent ? `<div><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">المحتوى الكامل</h2><p style="font-size: 12px; text-align: justify; white-space: pre-wrap;">${fullContent.replace(/\n/g, '<br>')}</p></div>` : ''}
+                    </div>
+                `;
+                
+                const element = document.createElement('div');
+                element.innerHTML = htmlContent;
+                
+                const opt = {
+                    margin: 15,
+                    filename: `${title.substring(0, 30)}.pdf`,
+                    image: { type: 'jpeg', quality: 0.95 },
+                    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                
+                html2pdf().set(opt).from(element).save();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('حدث خطأ في تصدير PDF');
+            }
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
