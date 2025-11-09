@@ -1,21 +1,51 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from models import db, User, Transcript
 import requests
 import os
 import time
+import secrets
+import logging
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///youtube_transcripts.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
-app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
+# Only use secure cookies in production (HTTPS)
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
 
-CORS(app)
+# CORS Configuration - Only allow specific origins
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:5000", "http://127.0.0.1:5000"],
+        "methods": ["GET", "POST"],
+        "allow_headers": ["Content-Type"],
+        "supports_credentials": True
+    }
+})
+
+# Rate Limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# Security Logging
+logging.basicConfig(
+    filename='security.log',
+    level=logging.WARNING,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 db.init_app(app)
 
 # Security Headers
@@ -24,7 +54,9 @@ def set_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    # Only use HSTS in production
+    if os.environ.get('FLASK_ENV') == 'production':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     response.headers['Content-Security-Policy'] = "default-src 'self' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:;"
     return response
 
@@ -47,6 +79,7 @@ def index():
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -55,22 +88,29 @@ def login():
         data = request.get_json() if request.is_json else request.form
         email = data.get('email')
         password = data.get('password')
+        remember = data.get('remember', False)
         
         user = User.query.filter_by(email=email).first()
         
         if user and user.check_password(password):
-            login_user(user)
+            # Remember me functionality
+            login_user(user, remember=remember)
+            logging.info(f"Successful login for email: {email} from IP: {request.remote_addr}")
             if request.is_json:
                 return jsonify({'success': True, 'message': 'تم تسجيل الدخول بنجاح'})
             return redirect(url_for('index'))
         
+        # Log failed login attempt
+        logging.warning(f"Failed login attempt for email: {email} from IP: {request.remote_addr}")
+        
         if request.is_json:
             return jsonify({'success': False, 'message': 'البريد الإلكتروني أو كلمة المرور غير صحيحة'}), 401
-        flash('البريد الإلكتروني أو كلمة المرور غير صحيحة')
+        return render_template('login.html', error='البريد الإلكتروني أو كلمة المرور غير صحيحة')
     
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit("5 per hour")
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -296,6 +336,85 @@ def chat():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+# Password Reset Routes
+@app.route('/forgot-password', methods=['GET'])
+def forgot_password_page():
+    return render_template('forgot_password.html')
+
+@app.route('/api/forgot-password', methods=['POST'])
+@limiter.limit("3 per hour")
+def forgot_password():
+    """Handle forgot password request"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({'error': 'البريد الإلكتروني مطلوب'}), 400
+        
+        user = User.query.filter_by(email=email).first()
+        
+        if user:
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            reset_expiry = datetime.utcnow() + timedelta(hours=1)
+            
+            # Store token in user record (you'll need to add these fields to User model)
+            user.reset_token = reset_token
+            user.reset_token_expiry = reset_expiry
+            db.session.commit()
+            
+            # In production, send email here
+            reset_link = f"{request.host_url}reset-password/{reset_token}"
+            
+            # TODO: Send email with reset_link
+            # For development only - log the link
+            if os.environ.get('FLASK_ENV') != 'production':
+                logging.info(f"Password reset link for {email}: {reset_link}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني'
+            })
+        else:
+            # Don't reveal if email exists or not (security best practice)
+            return jsonify({
+                'success': True,
+                'message': 'إذا كان البريد الإلكتروني موجوداً، سيتم إرسال رابط إعادة التعيين'
+            })
+            
+    except Exception as e:
+        print(f"Forgot password error: {str(e)}")
+        return jsonify({'error': 'حدث خطأ، يرجى المحاولة مرة أخرى'}), 500
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Handle password reset"""
+    user = User.query.filter_by(reset_token=token).first()
+    
+    if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.utcnow():
+        return render_template('reset_password.html', error='رابط إعادة التعيين غير صالح أو منتهي الصلاحية', token=token)
+    
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not password or len(password) < 6:
+            return render_template('reset_password.html', error='كلمة المرور يجب أن تكون 6 أحرف على الأقل', token=token)
+        
+        if password != confirm_password:
+            return render_template('reset_password.html', error='كلمتا المرور غير متطابقتين', token=token)
+        
+        # Update password
+        user.set_password(password)
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        
+        return render_template('login.html', success='تم تغيير كلمة المرور بنجاح! يمكنك الآن تسجيل الدخول')
+    
+    return render_template('reset_password.html', token=token)
 
 if __name__ == '__main__':
     with app.app_context():

@@ -14,6 +14,10 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Password reset fields
+    reset_token = db.Column(db.String(255), nullable=True)
+    reset_token_expiry = db.Column(db.DateTime, nullable=True)
+    
     # Relationship
     transcripts = db.relationship('Transcript', backref='user', lazy=True, cascade='all, delete-orphan')
     

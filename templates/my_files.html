@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ملفاتي - YouTube Transcript</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="{{ url_for('static', filename='js/pdf-export-new.js') }}" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Tajawal', sans-serif; }
@@ -49,7 +51,18 @@
                         {% endif %}
                         
                         <button onclick="viewTranscript({{ transcript.id }})" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">عرض التفاصيل</button>
-                        <button onclick="exportTranscriptPDF({{ transcript.id }})" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm ml-2">تصدير PDF</button>
+                        <button onclick="exportTranscriptPDF({{ transcript.id }})" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg text-sm ml-2">
+                            <svg class="w-4 h-4 inline-block ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path>
+                            </svg>
+                            PDF
+                        </button>
+                        <button onclick="exportTranscriptWord({{ transcript.id }})" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg text-sm ml-2">
+                            <svg class="w-4 h-4 inline-block ml-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
+                            </svg>
+                            Word
+                        </button>
                     </div>
                 </div>
             </div>
@@ -287,51 +300,8 @@
             return messageId;
         }
 
-        async function exportTranscriptPDF(id) {
-            try {
-                const response = await fetch(`/api/transcript/${id}`);
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    alert('فشل في تحميل البيانات');
-                    return;
-                }
-                
-                const title = data.videoTitle || 'تفريغ محتوى يوتيوب';
-                const introduction = data.introduction || '';
-                const summary = data.summary || '';
-                const mainPoints = data.mainPoints || '';
-                const fullContent = data.fullContent || '';
-                
-                const htmlContent = `
-                    <div style="font-family: 'Tajawal', Arial, sans-serif; direction: rtl; padding: 20px; color: #000; line-height: 1.8;">
-                        <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #FF0000; text-align: center;">${title}</h1>
-                        ${data.video_url ? `<p style="font-size: 11px; margin-bottom: 20px; color: #666; text-align: center;">الرابط: ${data.video_url}</p>` : ''}
-                        ${introduction ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">المقدمة</h2><p style="font-size: 14px; text-align: justify;">${introduction.replace(/\n/g, '<br>')}</p></div>` : ''}
-                        ${summary ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">الملخص</h2><p style="font-size: 14px; text-align: justify;">${summary.replace(/\n/g, '<br>')}</p></div>` : ''}
-                        ${mainPoints ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">أهم النقاط</h2><p style="font-size: 14px; text-align: justify; white-space: pre-wrap;">${mainPoints.replace(/\n/g, '<br>')}</p></div>` : ''}
-                        ${fullContent ? `<div><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">المحتوى الكامل</h2><p style="font-size: 12px; text-align: justify; white-space: pre-wrap;">${fullContent.replace(/\n/g, '<br>')}</p></div>` : ''}
-                    </div>
-                `;
-                
-                const element = document.createElement('div');
-                element.innerHTML = htmlContent;
-                
-                const opt = {
-                    margin: 15,
-                    filename: `${title.substring(0, 30)}.pdf`,
-                    image: { type: 'jpeg', quality: 0.95 },
-                    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                };
-                
-                html2pdf().set(opt).from(element).save();
-                
-            } catch (error) {
-                console.error('Error:', error);
-                alert('حدث خطأ في تصدير PDF');
-            }
-        }
+        // PDF Export - استخدام الدالة المحسّنة من pdf-export.js
+        // الدالة exportTranscriptPDF موجودة في ملف pdf-export.js
 
         // Close modal on escape key
         document.addEventListener('keydown', function(e) {

@@ -44,7 +44,6 @@ dist-ssr/
 *.local
 src/
 public/
-index.html
 vite.config.js
 package.json
 package-lock.json

@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Transcript - تفريغ محتوى يوتيوب</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Tajawal', 'Roboto', sans-serif;
+        }
+        
+        body {
+            background: #0f0f0f;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        .slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        .youtube-red {
+            background: #FF0000;
+        }
+        
+        .youtube-dark {
+            background: #282828;
+        }
+        
+        .youtube-darker {
+            background: #181818;
+        }
+        
+        .youtube-btn {
+            background: #FF0000;
+            transition: all 0.2s ease;
+        }
+        
+        .youtube-btn:hover {
+            background: #CC0000;
+            transform: scale(1.02);
+            box-shadow: 0 8px 16px rgba(255, 0, 0, 0.3);
+        }
+        
+        .youtube-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .card {
+            background: #282828;
+            border: 1px solid #3f3f3f;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            border-color: #FF0000;
+            box-shadow: 0 4px 20px rgba(255, 0, 0, 0.1);
+        }
+        
+        input {
+            background: #121212;
+            border: 2px solid #3f3f3f;
+            color: #fff;
+            transition: all 0.2s ease;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #FF0000;
+            background: #181818;
+        }
+        
+        input::placeholder {
+            color: #aaa;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #3f3f3f;
+            border-top: 3px solid #FF0000;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .badge {
+            background: #FF0000;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .section-title {
+            color: #fff;
+            font-weight: 700;
+            font-size: 20px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: #FF0000;
+            border-radius: 2px;
+        }
+        
+        .content-box {
+            background: #181818;
+            border-radius: 12px;
+            padding: 20px;
+            color: #fff;
+            line-height: 1.8;
+        }
+        
+        .yt-icon {
+            width: 80px;
+            height: 80px;
+            background: #FF0000;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(255, 0, 0, 0.4);
+        }
+        
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #181818;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f3f;
+            border-radius: 6px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FF0000;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-gray-900 border-b border-gray-800 px-4 py-4">
+        <div class="container mx-auto flex justify-between items-center max-w-6xl">
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-white font-bold text-xl">YouTube Transcript</a>
+                <a href="/" class="text-red-500 font-semibold">الرئيسية</a>
+                <a href="/my-files" class="text-gray-400 hover:text-white">ملفاتي</a>
+            </div>
+            <a href="/logout" class="text-gray-400 hover:text-red-500">تسجيل الخروج</a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <header class="text-center mb-12 fade-in">
+            <div class="flex justify-center mb-6">
+                <div class="yt-icon">
+                    <svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                </div>
+            </div>
+            <h1 class="text-5xl font-black text-white mb-4">
+                YouTube Transcript
+            </h1>
+            <p class="text-xl text-gray-400 mb-6">
+                حوّل أي فيديو يوتيوب إلى نص مكتوب مع ملخص ذكي بالذكاء الاصطناعي
+            </p>
+            <div class="flex justify-center gap-3 flex-wrap">
+                <span class="badge">AI Powered</span>
+                <span class="badge">مجاني 100%</span>
+                <span class="badge">سريع ودقيق</span>
+            </div>
+        </header>
+
+        <!-- Input Form -->
+        <div class="card rounded-2xl p-8 mb-8 slide-in">
+            <form id="transcriptForm">
+                <label class="block text-white font-bold mb-4 text-lg">
+                    أدخل رابط الفيديو من YouTube
+                </label>
+                <div class="flex gap-3 flex-col sm:flex-row">
+                    <input 
+                        type="text" 
+                        id="videoUrl" 
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        class="flex-1 px-5 py-4 rounded-lg text-lg font-medium"
+                        required
+                    >
+                    <button 
+                        type="submit"
+                        class="youtube-btn text-white font-bold py-4 px-8 rounded-lg text-lg whitespace-nowrap"
+                    >
+                        ابدأ التفريغ
+                    </button>
+                </div>
+                <p id="errorMsg" class="mt-3 text-sm text-red-400 font-semibold hidden"></p>
+            </form>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden card rounded-2xl p-12 text-center fade-in">
+            <div class="loading-spinner mx-auto mb-6"></div>
+            <h3 class="text-2xl font-bold text-white mb-2">جاري تفريغ المحتوى...</h3>
+            <p class="text-gray-400">قد تستغرق هذه العملية بضع دقائق</p>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden space-y-6 fade-in">
+            <!-- Video Info -->
+            <div class="card rounded-2xl p-6">
+                <div class="flex items-start gap-4">
+                    <div class="w-14 h-14 youtube-red rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h2 id="videoTitle" class="text-2xl font-bold text-white mb-2"></h2>
+                        <a id="videoLink" href="#" target="_blank" class="inline-flex items-center gap-2 text-red-500 hover:text-red-400 font-semibold transition-colors">
+                            <span>مشاهدة على YouTube</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="card rounded-2xl p-6">
+                <h3 class="section-title">الملخص الذكي</h3>
+                
+                <div id="introduction" class="content-box mb-4 hidden">
+                    <h4 class="text-red-500 font-bold mb-2 text-lg">المقدمة</h4>
+                    <div class="text-gray-300"></div>
+                </div>
+
+                <div id="summary" class="content-box mb-4 hidden">
+                    <h4 class="text-red-500 font-bold mb-2 text-lg">الملخص</h4>
+                    <div class="text-gray-300"></div>
+                </div>
+
+                <div id="mainPoints" class="content-box hidden">
+                    <h4 class="text-red-500 font-bold mb-2 text-lg">أهم النقاط</h4>
+                    <div class="text-gray-300"></div>
+                </div>
+            </div>
+
+            <!-- Full Content -->
+            <div class="card rounded-2xl p-6">
+                <button id="toggleContent" class="w-full text-right flex items-center justify-between hover:bg-gray-700/50 -m-6 p-6 rounded-2xl transition-colors">
+                    <h3 class="section-title mb-0">المحتوى الكامل</h3>
+                    <span id="toggleIcon" class="text-2xl text-gray-400">▼</span>
+                </button>
+                <div id="fullContent" class="hidden mt-6 pt-6 border-t border-gray-700">
+                    <div class="content-box max-h-96 overflow-y-auto">
+                        <div class="text-gray-300 whitespace-pre-wrap"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Buttons -->
+            <div class="flex gap-3 justify-center flex-wrap">
+                <button onclick="exportWord()" class="youtube-btn text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path>
+                    </svg>
+                    <span>تصدير Word</span>
+                </button>
+                <button onclick="exportPDF()" class="youtube-btn text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span>تصدير PDF</span>
+                </button>
+            </div>
+
+            <!-- ChatBot -->
+            <div class="card rounded-2xl p-6 mt-6">
+                <h3 class="section-title mb-4">💬 ناقش الفيديو مع الذكاء الاصطناعي</h3>
+                
+                <!-- Chat Messages -->
+                <div id="chatMessages" class="content-box mb-4 max-h-96 overflow-y-auto space-y-3">
+                    <div class="text-gray-400 text-center py-8">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                        <p>ابدأ المحادثة واسأل أي سؤال عن الفيديو</p>
+                    </div>
+                </div>
+
+                <!-- Chat Input -->
+                <div class="flex gap-3">
+                    <input 
+                        type="text" 
+                        id="chatInput" 
+                        placeholder="اكتب سؤالك هنا..."
+                        class="flex-1 px-4 py-3 rounded-lg text-base"
+                        onkeypress="if(event.key === 'Enter') sendMessage()"
+                    >
+                    <button 
+                        onclick="sendMessage()"
+                        class="youtube-btn text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                        <span>إرسال</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center mt-12 text-gray-500 text-sm">
+            <p>صُنع بإتقان © 2025</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        document.getElementById('transcriptForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const url = document.getElementById('videoUrl').value.trim();
+            const errorMsg = document.getElementById('errorMsg');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            
+            // Validate YouTube URL
+            const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+            if (!youtubeRegex.test(url)) {
+                errorMsg.textContent = 'الرجاء إدخال رابط يوتيوب صحيح';
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            
+            errorMsg.classList.add('hidden');
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+            
+            try {
+                console.log('Sending URL:', url);
+                
+                const response = await fetch('/api/transcript', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                console.log('Response status:', response.status);
+                
+                let data = await response.json();
+                console.log('Response data:', data);
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'فشل في معالجة الطلب');
+                }
+                
+                // n8n returns array, get first item
+                if (Array.isArray(data) && data.length > 0) {
+                    data = data[0];
+                }
+                
+                console.log('Processed data:', data);
+                currentData = data;
+                displayResults(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                errorMsg.textContent = error.message || 'حدث خطأ أثناء معالجة الفيديو';
+                errorMsg.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        });
+
+        function displayResults(data) {
+            const results = document.getElementById('results');
+            
+            // Video info
+            const title = data.videoTitle || data.output?.subject || data.title || 'فيديو يوتيوب';
+            document.getElementById('videoTitle').textContent = title;
+            
+            if (data.videoUrl || data.url) {
+                document.getElementById('videoLink').href = data.videoUrl || data.url;
+            }
+            
+            // Introduction
+            const introduction = data.introduction || data.output?.introduction;
+            if (introduction) {
+                const intro = document.getElementById('introduction');
+                intro.querySelector('div').textContent = introduction;
+                intro.classList.remove('hidden');
+            }
+            
+            // Summary
+            const summary = data.summary;
+            if (summary) {
+                const summaryEl = document.getElementById('summary');
+                summaryEl.querySelector('div').textContent = summary;
+                summaryEl.classList.remove('hidden');
+            }
+            
+            // Main Points
+            const mainPoints = data.mainPoints;
+            if (mainPoints) {
+                const points = document.getElementById('mainPoints');
+                points.querySelector('div').textContent = mainPoints;
+                points.classList.remove('hidden');
+            }
+            
+            // Full Content
+            const fullContent = data.fullContent || data.fullcontent;
+            if (fullContent) {
+                document.querySelector('#fullContent div div').textContent = fullContent;
+            }
+            
+            results.classList.remove('hidden');
+        }
+
+        // Toggle full content
+        document.getElementById('toggleContent').addEventListener('click', () => {
+            const content = document.getElementById('fullContent');
+            const icon = document.getElementById('toggleIcon');
+            
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.textContent = '▲';
+            } else {
+                content.classList.add('hidden');
+                icon.textContent = '▼';
+            }
+        });
+
+        function exportWord() {
+            if (!currentData) return;
+            
+            const title = currentData.videoTitle || currentData.output?.subject || currentData.title || 'تفريغ محتوى يوتيوب';
+            const introduction = currentData.introduction || currentData.output?.introduction;
+            const fullContent = currentData.fullContent || currentData.fullcontent;
+            
+            let content = `${title}\n\n`;
+            if (currentData.videoUrl || currentData.url) content += `الرابط: ${currentData.videoUrl || currentData.url}\n\n`;
+            if (introduction) content += `المقدمة:\n${introduction}\n\n`;
+            if (currentData.summary) content += `الملخص:\n${currentData.summary}\n\n`;
+            if (currentData.mainPoints) content += `أهم النقاط:\n${currentData.mainPoints}\n\n`;
+            if (fullContent) content += `المحتوى الكامل:\n${fullContent}`;
+            
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'youtube-transcript.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function exportPDF() {
+            if (!currentData) return;
+            
+            try {
+                // Get full data from database if we have transcript ID
+                let dataToExport = currentData;
+                
+                const title = dataToExport.videoTitle || dataToExport.output?.subject || dataToExport.title || 'تفريغ محتوى يوتيوب';
+                const introduction = dataToExport.introduction || dataToExport.output?.introduction || '';
+                const summary = dataToExport.summary || '';
+                const mainPoints = dataToExport.mainPoints || '';
+                const fullContent = dataToExport.fullContent || dataToExport.fullcontent || '';
+                
+                // Create text content for PDF
+                let pdfContent = title + '\n\n';
+                
+                if (dataToExport.videoUrl || dataToExport.url) {
+                    pdfContent += 'الرابط: ' + (dataToExport.videoUrl || dataToExport.url) + '\n\n';
+                }
+                
+                pdfContent += '═══════════════════════════════════════\n\n';
+                
+                if (introduction) {
+                    pdfContent += 'المقدمة:\n' + introduction + '\n\n';
+                    pdfContent += '═══════════════════════════════════════\n\n';
+                }
+                
+                if (summary) {
+                    pdfContent += 'الملخص:\n' + summary + '\n\n';
+                    pdfContent += '═══════════════════════════════════════\n\n';
+                }
+                
+                if (mainPoints) {
+                    pdfContent += 'أهم النقاط:\n' + mainPoints + '\n\n';
+                    pdfContent += '═══════════════════════════════════════\n\n';
+                }
+                
+                if (fullContent) {
+                    pdfContent += 'المحتوى الكامل:\n' + fullContent;
+                }
+                
+                // Create HTML for better rendering
+                const htmlContent = `
+                    <div style="font-family: 'Tajawal', Arial, sans-serif; direction: rtl; padding: 20px; color: #000; line-height: 1.8;">
+                        <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #FF0000; text-align: center;">${title}</h1>
+                        ${(dataToExport.videoUrl || dataToExport.url) ? `<p style="font-size: 11px; margin-bottom: 20px; color: #666; text-align: center;">الرابط: ${dataToExport.videoUrl || dataToExport.url}</p>` : ''}
+                        ${introduction ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">المقدمة</h2><p style="font-size: 14px; text-align: justify;">${introduction.replace(/\n/g, '<br>')}</p></div>` : ''}
+                        ${summary ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">الملخص</h2><p style="font-size: 14px; text-align: justify;">${summary.replace(/\n/g, '<br>')}</p></div>` : ''}
+                        ${mainPoints ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">أهم النقاط</h2><p style="font-size: 14px; text-align: justify; white-space: pre-wrap;">${mainPoints.replace(/\n/g, '<br>')}</p></div>` : ''}
+                        ${fullContent ? `<div><h2 style="font-size: 18px; font-weight: bold; color: #FF0000; border-bottom: 2px solid #FF0000; padding-bottom: 5px; margin-bottom: 10px;">المحتوى الكامل</h2><p style="font-size: 12px; text-align: justify; white-space: pre-wrap;">${fullContent.replace(/\n/g, '<br>')}</p></div>` : ''}
+                    </div>
+                `;
+                
+                const element = document.createElement('div');
+                element.innerHTML = htmlContent;
+                
+                const opt = {
+                    margin: 15,
+                    filename: `youtube-transcript-${Date.now()}.pdf`,
+                    image: { type: 'jpeg', quality: 0.95 },
+                    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                
+                html2pdf().set(opt).from(element).save();
+                
+            } catch (error) {
+                console.error('PDF Export Error:', error);
+                alert('حدث خطأ في تصدير PDF. جرب تصدير Word بدلاً من ذلك.');
+            }
+        }
+
+        // ChatBot Functions
+        let chatSessionId = null;
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Clear input
+            input.value = '';
+            
+            // Add user message to chat
+            addMessageToChat('user', message);
+            
+            // Show typing indicator
+            const typingId = addMessageToChat('bot', '...', true);
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        message: message,
+                        sessionId: chatSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Chat response:', data);
+                
+                // Remove typing indicator
+                document.getElementById(typingId).remove();
+                
+                if (response.ok) {
+                    // Update session ID if provided
+                    if (data.sessionId) {
+                        chatSessionId = data.sessionId;
+                    }
+                    
+                    // Add bot response - n8n chat returns {output: "message"}
+                    const botMessage = data.output || data.response || data.message || 'عذراً، لم أتمكن من الحصول على رد';
+                    
+                    if (botMessage && botMessage.trim()) {
+                        addMessageToChat('bot', botMessage);
+                    } else {
+                        addMessageToChat('bot', 'عذراً، لم أتمكن من الحصول على رد مناسب');
+                    }
+                } else {
+                    const errorMsg = data.error || 'حدث خطأ في الاتصال بالشات بوت';
+                    addMessageToChat('bot', `عذراً، ${errorMsg}`);
+                }
+                
+            } catch (error) {
+                console.error('Chat error:', error);
+                document.getElementById(typingId).remove();
+                addMessageToChat('bot', 'عذراً، حدث خطأ في الاتصال');
+            }
+        }
+
+        function addMessageToChat(type, message, isTyping = false) {
+            const messagesContainer = document.getElementById('chatMessages');
+            
+            // Remove welcome message if exists
+            const welcome = messagesContainer.querySelector('.text-center');
+            if (welcome) {
+                welcome.remove();
+            }
+            
+            const messageId = 'msg-' + Date.now();
+            const messageDiv = document.createElement('div');
+            messageDiv.id = messageId;
+            messageDiv.className = `flex ${type === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubbleClass = type === 'user' 
+                ? 'bg-red-600 text-white' 
+                : 'bg-gray-700 text-gray-200';
+            
+            messageDiv.innerHTML = `
+                <div class="${bubbleClass} rounded-2xl px-4 py-3 max-w-[80%] ${isTyping ? 'animate-pulse' : ''}">
+                    <p class="text-sm leading-relaxed whitespace-pre-wrap">${message}</p>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            return messageId;
+        }
+    </script>
+</body>
+</html>
