@@ -13,7 +13,10 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///youtube_transcripts.db'
+database_url = os.environ.get('DATABASE_URL')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///youtube_transcripts.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 # Only use secure cookies in production (HTTPS)
@@ -47,6 +50,27 @@ logging.basicConfig(
 )
 
 db.init_app(app)
+
+@app.before_first_request
+def ensure_database_tables():
+    db.create_all()
+    ensure_default_user()
+
+# Seed a default user so Render deployments always have credentials
+def ensure_default_user():
+    default_username = 'sos'
+    default_email = 'sos@example.com'
+    default_password = 'Ghgh@0011'
+
+    existing = User.query.filter_by(username=default_username).first()
+    if existing:
+        return
+
+    user = User(username=default_username, email=default_email)
+    user.set_password(default_password)
+    db.session.add(user)
+    db.session.commit()
+    logging.info('Created default user sos for initial access')
 
 # Security Headers
 @app.after_request

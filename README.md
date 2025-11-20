@@ -79,6 +79,28 @@ python app.py
 
 التطبيق سيعمل على: `http://localhost:5000`
 
+### 6. نشر بالحاوية (Docker)
+
+```bash
+# بناء الصورة
+docker build -t youtube-transcript .
+
+# التشغيل مع تحميل متغيرات البيئة من ملف .env وفتح المنفذ 5000
+docker run --env-file .env --rm -p 5000:5000 youtube-transcript
+```
+
+تأكد من ملئ قيم `SECRET_KEY`, `N8N_WEBHOOK_URL`, و `N8N_CHAT_WEBHOOK_URL` في ملف `.env` (يمكن نسخ `.env.example`).
+
+### 7. رفع المشروع إلى GitHub
+
+```bash
+git add .
+git commit -m "Prepare for Render deployment"
+git push origin main
+```
+
+بعد الرفع، اربط المشروع بـ Render عبر Blueprint أو ربط الخدمة في `render.yaml`.
+
 ## 📁 هيكل المشروع
 
 ```
