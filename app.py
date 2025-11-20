@@ -51,11 +51,6 @@ logging.basicConfig(
 
 db.init_app(app)
 
-@app.before_first_request
-def ensure_database_tables():
-    db.create_all()
-    ensure_default_user()
-
 # Seed a default user so Render deployments always have credentials
 def ensure_default_user():
     default_username = 'sos'
@@ -71,6 +66,13 @@ def ensure_default_user():
     db.session.add(user)
     db.session.commit()
     logging.info('Created default user sos for initial access')
+
+def initialize_database():
+    with app.app_context():
+        db.create_all()
+        ensure_default_user()
+
+initialize_database()
 
 # Security Headers
 @app.after_request
