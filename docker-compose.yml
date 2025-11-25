@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: youtube_transcript_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: youtube_transcripts
+      POSTGRES_USER: youtube_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U youtube_user -d youtube_transcripts"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Flask Web Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: youtube_transcript_app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}
+      - DATABASE_URL=postgresql://youtube_user:${DB_PASSWORD:-changeme123}@db:5432/youtube_transcripts
+      - PORT=5000
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./instance:/app/instance
+      - ./security.log:/app/security.log
+    command: gunicorn --bind 0.0.0.0:5000 --workers 2 --threads 4 --timeout 120 app:app
+
+volumes:
+  postgres_data:
+    driver: local

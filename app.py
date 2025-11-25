@@ -70,6 +70,29 @@ def ensure_default_user():
 def initialize_database():
     with app.app_context():
         db.create_all()
+        
+        # Add missing columns if they don't exist (for existing databases)
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('users')]
+            
+            # Add reset_token column if missing
+            if 'reset_token' not in columns:
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)'))
+                    conn.commit()
+                print("Added reset_token column")
+            
+            # Add reset_token_expiry column if missing
+            if 'reset_token_expiry' not in columns:
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE users ADD COLUMN reset_token_expiry TIMESTAMP'))
+                    conn.commit()
+                print("Added reset_token_expiry column")
+        except Exception as e:
+            print(f"Migration warning: {e}")
+        
         ensure_default_user()
 
 initialize_database()

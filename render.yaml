@@ -1,4 +1,11 @@
+databases:
+  - name: youtube-transcript-db
+    databaseName: youtube_transcripts
+    user: youtube_user
+    plan: free
+
 services:
+
   # Web Service
   - type: web
     name: youtube-transcript
@@ -20,11 +27,3 @@ services:
           property: connectionString
     healthCheckPath: /login
     autoDeploy: true
-
-  # Database (SQLite لا يحتاج خدمة منفصلة، لكن يمكن استخدام PostgreSQL)
-  # إذا أردت استخدام PostgreSQL بدلاً من SQLite:
-  # - type: pserv
-  #   name: youtube-transcript-db
-  #   env: docker
-  #   plan: free
-  #   dockerfilePath: ./Dockerfile

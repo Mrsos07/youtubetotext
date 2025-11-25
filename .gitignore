@@ -36,6 +36,7 @@ youtube_transcripts.db
 logs
 *.log
 npm-debug.log*
+security.log
 
 # Old React files (not needed)
 node_modules/
