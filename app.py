@@ -53,45 +53,54 @@ db.init_app(app)
 
 # Seed a default user so Render deployments always have credentials
 def ensure_default_user():
-    default_username = 'sos'
-    default_email = 'sos@example.com'
-    default_password = 'Ghgh@0011'
+    try:
+        default_username = 'sos'
+        default_email = 'sos@example.com'
+        default_password = 'Ghgh@0011'
 
-    existing = User.query.filter_by(username=default_username).first()
-    if existing:
-        return
+        existing = User.query.filter_by(username=default_username).first()
+        if existing:
+            return
 
-    user = User(username=default_username, email=default_email)
-    user.set_password(default_password)
-    db.session.add(user)
-    db.session.commit()
-    logging.info('Created default user sos for initial access')
+        user = User(username=default_username, email=default_email)
+        user.set_password(default_password)
+        db.session.add(user)
+        db.session.commit()
+        logging.info('Created default user sos for initial access')
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating default user: {e}")
 
 def initialize_database():
     with app.app_context():
-        db.create_all()
+        # Check if tables exist first
+        from sqlalchemy import inspect, text
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
         
-        # Add missing columns if they don't exist (for existing databases)
-        try:
-            from sqlalchemy import inspect, text
-            inspector = inspect(db.engine)
-            columns = [col['name'] for col in inspector.get_columns('users')]
-            
-            # Add reset_token column if missing
-            if 'reset_token' not in columns:
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)'))
-                    conn.commit()
-                print("Added reset_token column")
-            
-            # Add reset_token_expiry column if missing
-            if 'reset_token_expiry' not in columns:
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE users ADD COLUMN reset_token_expiry TIMESTAMP'))
-                    conn.commit()
-                print("Added reset_token_expiry column")
-        except Exception as e:
-            print(f"Migration warning: {e}")
+        # If users table exists, migrate it first
+        if 'users' in tables:
+            try:
+                columns = [col['name'] for col in inspector.get_columns('users')]
+                
+                # Add reset_token column if missing
+                if 'reset_token' not in columns:
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)'))
+                        conn.commit()
+                    print("Added reset_token column")
+                
+                # Add reset_token_expiry column if missing
+                if 'reset_token_expiry' not in columns:
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE users ADD COLUMN reset_token_expiry TIMESTAMP'))
+                        conn.commit()
+                    print("Added reset_token_expiry column")
+            except Exception as e:
+                print(f"Migration warning: {e}")
+        
+        # Now create all tables (will skip existing ones)
+        db.create_all()
         
         ensure_default_user()
 
@@ -405,14 +414,19 @@ def forgot_password():
         user = User.query.filter_by(email=email).first()
         
         if user:
-            # Generate reset token
-            reset_token = secrets.token_urlsafe(32)
-            reset_expiry = datetime.utcnow() + timedelta(hours=1)
-            
-            # Store token in user record (you'll need to add these fields to User model)
-            user.reset_token = reset_token
-            user.reset_token_expiry = reset_expiry
-            db.session.commit()
+            try:
+                # Generate reset token
+                reset_token = secrets.token_urlsafe(32)
+                reset_expiry = datetime.utcnow() + timedelta(hours=1)
+                
+                # Store token in user record
+                user.reset_token = reset_token
+                user.reset_token_expiry = reset_expiry
+                db.session.commit()
+            except Exception as token_error:
+                db.session.rollback()
+                print(f"Error setting reset token: {token_error}")
+                return jsonify({'error': 'حدث خطأ، يرجى المحاولة مرة أخرى'}), 500
             
             # In production, send email here
             reset_link = f"{request.host_url}reset-password/{reset_token}"
@@ -440,10 +454,21 @@ def forgot_password():
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
     """Handle password reset"""
-    user = User.query.filter_by(reset_token=token).first()
+    try:
+        user = User.query.filter_by(reset_token=token).first()
+    except Exception as e:
+        print(f"Error querying reset token: {e}")
+        return render_template('reset_password.html', error='حدث خطأ، يرجى المحاولة مرة أخرى', token=token)
     
-    if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.utcnow():
-        return render_template('reset_password.html', error='رابط إعادة التعيين غير صالح أو منتهي الصلاحية', token=token)
+    if not user:
+        return render_template('reset_password.html', error='رابط إعادة التعيين غير صالح', token=token)
+    
+    try:
+        if not user.reset_token_expiry or user.reset_token_expiry < datetime.utcnow():
+            return render_template('reset_password.html', error='رابط إعادة التعيين منتهي الصلاحية', token=token)
+    except Exception as e:
+        print(f"Error checking token expiry: {e}")
+        return render_template('reset_password.html', error='حدث خطأ، يرجى المحاولة مرة أخرى', token=token)
     
     if request.method == 'POST':
         password = request.form.get('password')
@@ -455,13 +480,18 @@ def reset_password(token):
         if password != confirm_password:
             return render_template('reset_password.html', error='كلمتا المرور غير متطابقتين', token=token)
         
-        # Update password
-        user.set_password(password)
-        user.reset_token = None
-        user.reset_token_expiry = None
-        db.session.commit()
-        
-        return render_template('login.html', success='تم تغيير كلمة المرور بنجاح! يمكنك الآن تسجيل الدخول')
+        try:
+            # Update password
+            user.set_password(password)
+            user.reset_token = None
+            user.reset_token_expiry = None
+            db.session.commit()
+            
+            return render_template('login.html', success='تم تغيير كلمة المرور بنجاح! يمكنك الآن تسجيل الدخول')
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error resetting password: {e}")
+            return render_template('reset_password.html', error='حدث خطأ، يرجى المحاولة مرة أخرى', token=token)
     
     return render_template('reset_password.html', token=token)
 
