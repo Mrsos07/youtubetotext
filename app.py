@@ -58,14 +58,20 @@ def ensure_default_user():
         default_email = 'sos@example.com'
         default_password = 'Ghgh@0011'
 
-        existing = User.query.filter_by(username=default_username).first()
-        if existing:
+        # Check both username and email
+        existing_user = User.query.filter(
+            (User.username == default_username) | (User.email == default_email)
+        ).first()
+        
+        if existing_user:
+            print(f"Default user already exists: {existing_user.username}")
             return
 
         user = User(username=default_username, email=default_email)
         user.set_password(default_password)
         db.session.add(user)
         db.session.commit()
+        print('Created default user sos for initial access')
         logging.info('Created default user sos for initial access')
     except Exception as e:
         db.session.rollback()
